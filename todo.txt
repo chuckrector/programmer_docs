@@ -1,0 +1,1 @@
+[ ] Parse parameters in the alternate format in sample2.md (## Parameters)

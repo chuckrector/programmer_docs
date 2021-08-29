@@ -1,0 +1,46 @@
+8/28/2001
+
+Trying my hand at parsing some of the MSDN data on GitHub:
+
+Requirements section
+-=-=-=-=-=-=-=-=-=-=-
+The docs in GitHub are not rigorously consistent in terms of formatting.  For example, many documentation pages (e.g. GetClientRect) specify the required .lib and .dll files in a header block with a specific key whereas others (e.g. SetConsoleOutputCP) specify the requirements in a Markdown table near the end of the file.  For example:
+
+    ---
+    ...
+    req.lib: User32.lib
+    req.dll: User32.dll
+    ...
+    ---
+
+vs
+
+    ## Requirements
+    | &nbsp; | &nbsp; |
+    |-|-|
+    | Minimum supported client | Windows 2000 Professional \[desktop apps only\] |
+    | Minimum supported server | Windows 2000 Server \[desktop apps only\] |
+    | Header | ConsoleApi2.h (via WinCon.h, include Windows.h) |
+    | Library | Kernel32.lib |
+    | DLL | Kernel32.dll |
+
+It seems like it will be useful to accept a specific set of known formats, such as the two above, and then indicate which format was detected in the entry structs.  That way I can gather metrics and direct attention.  For example, what percentage of all the GitHub documents that I'm parsing are following as-yet-unsupported formats.  I could then get lists of those files and possibly farm them out to others as well.
+
+
+Escaping
+-=-=-=-=-
+For some reason [ and ] are escaped in the Requirements section when it occurs in the footer as Markdown.  I have no idea why.
+
+| Minimum supported client | Windows 2000 Professional \[desktop apps only\] |
+| Minimum supported server | Windows 2000 Server \[desktop apps only\] |
+
+
+Syntax
+-=-=-=-
+Some entries have a Syntax section which contains the full call signature.  Other entries have no inline signature at all.  I assume something is assembling the call signature from all of the markup which describes the parameters?  Similar to things like "2 minutes to read".
+
+
+HTML
+-=-=-
+Various type definitions are encased with HTML tags, e.g. <b>.
+
