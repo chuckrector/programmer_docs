@@ -209,11 +209,18 @@ SkipAnyAdjacent(file_reader *Reader, char *Chars)
 internal string *
 CutRight(string *String, int CutHere)
 {
-    Assert(InBounds(CutHere, 0, String->Length));
-
     string *Result = PushStruct(string);
-    Result->Length = (String->Length - CutHere);
-    Result->StringData = String->StringData + CutHere;
+    if (CutHere >= String->Length)
+    {
+        Result->Length = 0;
+        Result->StringData = PushArray(1, char);
+        Result->StringData[0] = 0;
+    }
+    else
+    {
+        Result->Length = (String->Length - CutHere);
+        Result->StringData = String->StringData + CutHere;
+    }
 
     return(Result);
 }
@@ -582,7 +589,11 @@ int main(int ArgCount, char **Args)
                 }
                 else if(StartsWith(Reader.Line, HEADER_REQUIRED_INCLUDE_HEADER_KEY))
                 {
-                    Entry.RequiredIncludeHeader = CutRight(Reader.Line, ArrayCountZ(HEADER_REQUIRED_INCLUDE_HEADER_KEY));
+                     string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_REQUIRED_INCLUDE_HEADER_KEY));
+                     if (S->Length)
+                     {
+                        Entry.RequiredIncludeHeader = S;
+                     }
                 }
             }
 
