@@ -1,1 +1,4 @@
 [ ] Parse parameters in the alternate format in sample2.md (## Parameters)
+[ ] Is it true that deprecated APIs are not in GitHub?  Even the history?  e.g. DirectSound
+    https://docs.microsoft.com/en-us/previous-versions/windows/desktop/ee417553(v=vs.85)
+    It's all up online but seemingly not in the win32 repository or its history.
