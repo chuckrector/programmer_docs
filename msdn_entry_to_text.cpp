@@ -42,11 +42,11 @@ PushSize(umm BytesNeeded)
 #define HEADER_REQUIRED_HEADER_KEY "req.header: "
 #define HEADER_REQUIRED_INCLUDE_HEADER_KEY "req.include-header: "
 
-#define FOOTER_MINIMUM_SUPPORTED_CLIENT_KEY "| Minimum supported client | "
-#define FOOTER_MINIMUM_SUPPORTED_SERVER_KEY "| Minimum supported server | "
+#define FOOTER_MINIMUM_SUPPORTED_CLIENT_KEY "| Minimum supported client"
+#define FOOTER_MINIMUM_SUPPORTED_SERVER_KEY "| Minimum supported server"
 #define FOOTER_LIB_REQUIRED_KEY "| Library | "
 #define FOOTER_DLL_REQUIRED_KEY "| DLL | "
-#define FOOTER_REQUIRED_HEADER_KEY "| Header | "
+#define FOOTER_REQUIRED_HEADER_KEY "| Header"
 
 struct string
 {
@@ -87,6 +87,7 @@ struct msdn_entry
     string *Description;
     string *MinimumSupportedClient;
     string *MinimumSupportedServer;
+    string *PlatformRequirements; // NOTE(chuck): If min supported aren't available, e.g. XInputGetState
     string *RequiredHeader;
     string *RequiredIncludeHeader; // NOTE(chuck): Optional
     string *RequiredLibrary;
@@ -252,54 +253,62 @@ UnescapeBrackets(string *String)
 internal string *
 TrimRight(string *String, char *Chars)
 {
-    string *Result = PushStruct(string);
-    Result->Length = String->Length;
-    Result->StringData = String->StringData;
-
-    int CharsLength = StringLength(Chars);
-    char *P = String->StringData + String->Length - 1;
-    int FoundCount = 0;
-    while(P != String->StringData)
+    string *Result = String;
+    if(String->Length)
     {
-        if(IsOneOf(*P, Chars))
+        Result = PushStruct(string);
+        Result->Length = String->Length;
+        Result->StringData = String->StringData;
+
+        int CharsLength = StringLength(Chars);
+        char *P = String->StringData + String->Length - 1;
+        int FoundCount = 0;
+        while(P != String->StringData)
         {
-            ++FoundCount;
-            --P;
+            if(IsOneOf(*P, Chars))
+            {
+                ++FoundCount;
+                --P;
+            }
+            else
+            {
+                break;
+            }
         }
-        else
-        {
-            break;
-        }
+        Result->Length -= FoundCount;
     }
-    Result->Length -= FoundCount;
     return(Result);
 }
 
 internal string *
 TrimLeft(string *String, char *Chars)
 {
-    string *Result = PushStruct(string);
-    Result->Length = String->Length;
-    Result->StringData = String->StringData;
-
-    int CharsLength = StringLength(Chars);
-    int Index = 0;
-    int FoundCount = 0;
-    for(int Index = 0;
-        Index < String->Length;
-        ++Index)
+    string *Result = String;
+    if(String->Length)
     {
-        if(IsOneOf(String->StringData[Index], Chars))
+        PushStruct(string);
+        Result->Length = String->Length;
+        Result->StringData = String->StringData;
+
+        int CharsLength = StringLength(Chars);
+        int Index = 0;
+        int FoundCount = 0;
+        for(int Index = 0;
+            Index < String->Length;
+            ++Index)
         {
-            ++FoundCount;
+            if(IsOneOf(String->StringData[Index], Chars))
+            {
+                ++FoundCount;
+            }
+            else
+            {
+                break;
+            }
         }
-        else
-        {
-            break;
-        }
+        Result->Length -= FoundCount;
+        Result->StringData += FoundCount;
     }
-    Result->Length -= FoundCount;
-    Result->StringData += FoundCount;
     return(Result);
 }
 
@@ -408,6 +417,21 @@ StringsAreEqual(string *String, char *Chars)
         }
     }
 
+    return(Result);
+}
+
+internal b32
+MemoryIsEqual(char *A, char *B, int Length)
+{
+    b32 Result = 1;
+    while(Length--)
+    {
+        if(*A++ != *B++)
+        {
+            Result = 0;
+            break;
+        }
+    }
     return(Result);
 }
 
@@ -523,13 +547,79 @@ EndsWith(string *String, char *Chars)
 }
 
 internal string *
+Replace(string *String, char *This, char *That)
+{
+    int ThisLength = StringLength(This);
+    int ThatLength = StringLength(That);
+    string *Result = PushStruct(string);
+
+    int ExpectedLength = 0;
+    for(int Index = 0;
+        Index < String->Length;
+        )
+    {
+        if(MemoryIsEqual(String->StringData + Index, This, ThisLength))
+        {
+            ExpectedLength += ThatLength;
+            Index += ThisLength;
+        }
+        else
+        {
+            ++ExpectedLength;
+            ++Index;
+        }
+    }
+
+    Result->Length = ExpectedLength;
+    Result->StringData = PushArray(ExpectedLength + 1, char);
+    char *P = Result->StringData;
+    for(int Index = 0;
+        Index < String->Length;
+        )
+    {
+        if(MemoryIsEqual(String->StringData + Index, This, ThisLength))
+        {
+            Copy(P, That, ThatLength);
+            Index += ThisLength;
+        }
+        else
+        {
+            *P++ = String->StringData[Index];
+            ++Index;
+        }
+    }
+    *P = 0;
+
+    return(Result);
+}
+
+internal string *
 StripHtmlBold(string *String)
 {
-    if(StartsWith(String, "<b>") && EndsWith(String, "</b>"))
+    string *Result = Replace(String, "<b>", "");
+    Result = Replace(Result, "</b>", "");
+    return(Result);
+}
+
+internal b32
+StringContains(string *String, char *Chars)
+{
+    int CharsLength = StringLength(Chars);
+    b32 Result = 0;
+    if(CharsLength < String->Length)
     {
-        String = Substring(String, 3, String->Length - 4);
+        for(int Index = 0;
+            Index < String->Length;
+            ++Index)
+        {
+            if(MemoryIsEqual(String->StringData + Index, Chars, CharsLength))
+            {
+                Result = 1;
+                break;
+            }
+        }
     }
-    return(String);
+    return(Result);
 }
 
 int main(int ArgCount, char **Args)
@@ -569,11 +659,21 @@ int main(int ArgCount, char **Args)
                 }
                 else if(StartsWith(Reader.Line, HEADER_MINIMUM_SUPPORTED_CLIENT_KEY))
                 {
-                    Entry.MinimumSupportedClient = CutRight(Reader.Line, ArrayCountZ(HEADER_MINIMUM_SUPPORTED_CLIENT_KEY));
+                    string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_MINIMUM_SUPPORTED_CLIENT_KEY));
+                    if(S->Length)
+                    {
+                        S = Replace(S, "<br/>", "");
+                        Entry.MinimumSupportedClient = S;
+                    }
                 }
                 else if(StartsWith(Reader.Line, HEADER_MINIMUM_SUPPORTED_SERVER_KEY))
                 {
-                    Entry.MinimumSupportedServer = CutRight(Reader.Line, ArrayCountZ(HEADER_MINIMUM_SUPPORTED_SERVER_KEY));
+                    string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_MINIMUM_SUPPORTED_SERVER_KEY));;
+                    if(S->Length)
+                    {
+                        S = Replace(S, "<br/>", "");
+                        Entry.MinimumSupportedServer = S;
+                    }
                 }
                 else if(StartsWith(Reader.Line, HEADER_LIB_REQUIRED_KEY))
                 {
@@ -714,15 +814,39 @@ int main(int ArgCount, char **Args)
                 {
                     SkipBlankLines(&Reader);
                     int Start = Reader.At;
-                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "##"))
+                    int LineBeforePlatformRequirements = -1;
+                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "## "))
                     {
-                        // NOTE(chuck): Do nothing.
+                        if(StringContains(Reader.Line, "id=\"Platform_Requirements\"") ||
+                           StartsWith(Reader.Line, "### Platform Requirements"))
+                        {
+                            LineBeforePlatformRequirements = Reader.PreviousLineAt;
+                            int StartPlatformRequirements = Reader.At;
+                            while(ReadLine(&Reader) && !StartsWith(Reader.Line, "## "))
+                            {
+                                // NOTE(chuck): Do nothing.
+                            }
+                            Assert(StartsWith(Reader.Line, "#"));
+                            Reader.At = Reader.PreviousLineAt;
+                            string *S = NewStringFrom(Reader.At - StartPlatformRequirements, Reader.FileData->StringData + StartPlatformRequirements);
+                            S = TrimRight(S, " \r\n");
+                            S = TrimLeft(S, " \r\n");
+                            Entry.PlatformRequirements = S;
+                        }
                     }
+
                     Assert(StartsWith(Reader.Line, "##"));
                     Reader.At = Reader.PreviousLineAt;
+                    if(LineBeforePlatformRequirements != -1)
+                    {
+                        Reader.At = LineBeforePlatformRequirements;
+                    }
                     string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
                     S = TrimRight(S, " \r\n");
-                    Entry.Remarks = S;
+                    if(S->Length)
+                    {
+                        Entry.Remarks = S;
+                    }
                 }
                 else if(StartsWith(Reader.Line, "## Requirements"))
                 {
@@ -734,6 +858,7 @@ int main(int ArgCount, char **Args)
 
                             string *S = TrimRight(Reader.Line, " |");
                             S = CutRight(S, ArrayCountZ(FOOTER_MINIMUM_SUPPORTED_CLIENT_KEY));
+                            S = TrimLeft(S, " |");
                             S = UnescapeBrackets(S);
                             Entry.MinimumSupportedClient = S;
                         }
@@ -743,6 +868,7 @@ int main(int ArgCount, char **Args)
 
                             string *S = TrimRight(Reader.Line, " |");
                             S = CutRight(S, ArrayCountZ(FOOTER_MINIMUM_SUPPORTED_SERVER_KEY));
+                            S = TrimLeft(S, " |");
                             S = UnescapeBrackets(S);
                             Entry.MinimumSupportedServer = S;
                         }
@@ -765,7 +891,14 @@ int main(int ArgCount, char **Args)
                             Assert(!Entry.RequiredHeader);
 
                             string *S = TrimRight(Reader.Line, " |");
-                            Entry.RequiredHeader = CutRight(S, ArrayCountZ(FOOTER_REQUIRED_HEADER_KEY));
+                            S = CutRight(S, ArrayCountZ(FOOTER_REQUIRED_HEADER_KEY));
+                            S = Replace(S, "<br/>", "");
+                            S = Replace(S, "<dl>", "");
+                            S = Replace(S, "</dl>", "");
+                            S = Replace(S, "<dt>", "");
+                            S = Replace(S, "</dt>", "");
+                            S = TrimLeft(S, " |");
+                            Entry.RequiredHeader = S;
                         }
                     }
                 }
@@ -794,16 +927,40 @@ int main(int ArgCount, char **Args)
             }
 
             PrintHeader('=', "%.*s", Entry.Title->Length, Entry.Title->StringData);
-            printf("Minimum supported client: %.*s\n", Entry.MinimumSupportedClient->Length, Entry.MinimumSupportedClient->StringData);
-            printf("Minimum supported server: %.*s\n\n", Entry.MinimumSupportedServer->Length, Entry.MinimumSupportedServer->StringData);
-            printf(" Header: %.*s", Entry.RequiredHeader->Length, Entry.RequiredHeader->StringData);
-            if(Entry.RequiredIncludeHeader)
+            if(Entry.MinimumSupportedClient)
             {
-                printf(" (include %.*s)", Entry.RequiredIncludeHeader->Length, Entry.RequiredIncludeHeader->StringData);
+                printf("Minimum supported client: %.*s\n", Entry.MinimumSupportedClient->Length, Entry.MinimumSupportedClient->StringData);
+                printf("Minimum supported server: %.*s\n", Entry.MinimumSupportedServer->Length, Entry.MinimumSupportedServer->StringData);
             }
-            printf("\n");
-            printf("Library: %.*s\n", Entry.RequiredLibrary->Length, Entry.RequiredLibrary->StringData);
-            printf("    DLL: %.*s\n\n", Entry.RequiredDLL->Length, Entry.RequiredDLL->StringData);
+            else if(Entry.PlatformRequirements)
+            {
+                printf("Platform requirements: %.*s\n", Entry.PlatformRequirements->Length, Entry.PlatformRequirements->StringData);
+            }
+            if(Entry.RequiredHeader)
+            {
+                printf("Header: %.*s", Entry.RequiredHeader->Length, Entry.RequiredHeader->StringData);
+                if(Entry.RequiredIncludeHeader)
+                {
+                    printf(" (include %.*s)", Entry.RequiredIncludeHeader->Length, Entry.RequiredIncludeHeader->StringData);
+                }
+            }
+            if(Entry.RequiredLibrary)
+            {
+                printf("Library: %.*s\n", Entry.RequiredLibrary->Length, Entry.RequiredLibrary->StringData);
+            }
+            if(Entry.RequiredDLL)
+            {
+                printf("DLL: %.*s\n", Entry.RequiredDLL->Length, Entry.RequiredDLL->StringData);
+            }
+            if(Entry.MinimumSupportedClient ||
+               Entry.MinimumSupportedServer ||
+               Entry.PlatformRequirements ||
+               Entry.RequiredHeader ||
+               Entry.RequiredLibrary ||
+               Entry.RequiredDLL)
+            {
+                printf("\n");
+            }
 
             if(Entry.Syntax)
             {
@@ -834,10 +991,13 @@ int main(int ArgCount, char **Args)
                 }
             }
 
-            PrintHeader('-', "Return value");
             if(Entry.ReturnValue.Type)
             {
-                printf("Type: %.*s\n", Entry.ReturnValue.Type->Length, Entry.ReturnValue.Type->StringData);
+                PrintHeader('-', "Return value");
+                if(Entry.ReturnValue.Type)
+                {
+                    printf("Type: %.*s\n\n", Entry.ReturnValue.Type->Length, Entry.ReturnValue.Type->StringData);
+                }
             }
             if(Entry.ReturnValue.Description)
             {
