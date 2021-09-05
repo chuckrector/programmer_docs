@@ -677,11 +677,19 @@ int main(int ArgCount, char **Args)
                 }
                 else if(StartsWith(Reader.Line, HEADER_LIB_REQUIRED_KEY))
                 {
-                    Entry.RequiredLibrary = CutRight(Reader.Line, ArrayCountZ(HEADER_LIB_REQUIRED_KEY));
+                    string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_LIB_REQUIRED_KEY));
+                    if(S->Length)
+                    {
+                        Entry.RequiredLibrary = S;
+                    }
                 }
                 else if(StartsWith(Reader.Line, HEADER_DLL_REQUIRED_KEY))
                 {
-                    Entry.RequiredDLL = CutRight(Reader.Line, ArrayCountZ(HEADER_DLL_REQUIRED_KEY));
+                    string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_DLL_REQUIRED_KEY));
+                    if(S->Length)
+                    {
+                        Entry.RequiredDLL = S;
+                    }
                 }
                 else if(StartsWith(Reader.Line, HEADER_REQUIRED_HEADER_KEY))
                 {
@@ -835,17 +843,20 @@ int main(int ArgCount, char **Args)
                         }
                     }
 
-                    Assert(StartsWith(Reader.Line, "##"));
-                    Reader.At = Reader.PreviousLineAt;
-                    if(LineBeforePlatformRequirements != -1)
+                    if(!AtEnd(&Reader))
                     {
-                        Reader.At = LineBeforePlatformRequirements;
-                    }
-                    string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
-                    S = TrimRight(S, " \r\n");
-                    if(S->Length)
-                    {
-                        Entry.Remarks = S;
+                        Assert(StartsWith(Reader.Line, "##"));
+                        Reader.At = Reader.PreviousLineAt;
+                        if(LineBeforePlatformRequirements != -1)
+                        {
+                            Reader.At = LineBeforePlatformRequirements;
+                        }
+                        string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
+                        S = TrimRight(S, " \r\n");
+                        if(S->Length)
+                        {
+                            Entry.Remarks = S;
+                        }
                     }
                 }
                 else if(StartsWith(Reader.Line, "## Requirements"))
@@ -943,6 +954,7 @@ int main(int ArgCount, char **Args)
                 {
                     printf(" (include %.*s)", Entry.RequiredIncludeHeader->Length, Entry.RequiredIncludeHeader->StringData);
                 }
+                printf("\n");
             }
             if(Entry.RequiredLibrary)
             {
