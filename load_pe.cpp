@@ -64,7 +64,7 @@ struct pe_optional_header
 struct pe_section_header
 {
     unsigned char  Name[8];
-    unsigned long  Unused;
+    unsigned long  VirtualSize;
     unsigned long  VirtualAddress;
     unsigned long  RawLength;
     unsigned long  RawAddress;
@@ -79,6 +79,15 @@ struct bit_flag
 {
     unsigned long Bits;
     char *Description;
+};
+
+struct pe_import
+{
+    unsigned long OriginalFirstHunk;
+    unsigned long Timestamp;
+    unsigned long ForwarderChain;
+    unsigned long Name;
+    unsigned long FirstThunk;
 };
 
 static void
@@ -252,7 +261,7 @@ int main(int ArgCount, char **Args)
                             "Reserved",
                         };
                         for(int DirectoryIndex = 0;
-                            DirectoryIndex < PEOptionalHeader->DirectoryCount;
+                            DirectoryIndex < ArrayCount(PEOptionalHeader->Directory);
                             ++DirectoryIndex)
                         {
                             pe_directory *Directory = PEOptionalHeader->Directory + DirectoryIndex;
@@ -260,7 +269,7 @@ int main(int ArgCount, char **Args)
                                 DirectoryIndex, DirectoryDescriptor[DirectoryIndex],
                                 Directory->VirtualAddress, Directory->Size);
                         }
-
+                        
 
                         if(PEHeader->SectionCount)
                         {
@@ -311,7 +320,12 @@ int main(int ArgCount, char **Args)
                                 {0x40000000, "The section can be read."},
                                 {0x80000000, "The section can be written to."},
                             };
+
+                            pe_directory *ImportTable = PEOptionalHeader->Directory + 1;
+                            printf("Import table virtual address 0x%08x\n", ImportTable->VirtualAddress);
+
                             // NOTE(chuck): Optional header size varies!  I've seen 224 and 240 byte lengths;
+                            pe_section_header *ImportSection = 0;
                             pe_section_header *PESectionHeader = (pe_section_header *)((char *)PEOptionalHeader + PEHeader->OptionalHeaderLength);
                             for(int SectionIndex = 0;
                                 SectionIndex < PEHeader->SectionCount;
@@ -337,6 +351,36 @@ int main(int ArgCount, char **Args)
                                     PrintBitFlags(PESectionHeader->Characteristics, PESectionHeaderCharacteristics,
                                                   ArrayCount(PESectionHeaderCharacteristics), 6, 8);
                                     printf("\n");
+                                }
+
+                                unsigned long ImportVirtualAddress = ImportTable->VirtualAddress;
+                                if((ImportVirtualAddress >= PESectionHeader->VirtualAddress) &&
+                                    (ImportVirtualAddress < (PESectionHeader->VirtualAddress + PESectionHeader->VirtualSize)))
+                                {
+                                    ImportSection = PESectionHeader;
+                                }
+                            }
+
+                            if(ImportSection)
+                            {
+                                printf("DLL imports\n");
+                                char *RawOffset = Memory + ImportSection->RawAddress;
+                                for(pe_import *Import = (pe_import *)(RawOffset + (ImportTable->VirtualAddress - ImportSection->VirtualAddress));
+                                    Import->Name;
+                                    ++Import)
+                                {
+                                    printf("  %s\n", RawOffset + (Import->Name - ImportSection->VirtualAddress));
+                                    unsigned long Thunk = Import->OriginalFirstHunk;
+                                    if(!Thunk)
+                                    {
+                                        Thunk = Import->FirstThunk;
+                                    }
+                                    for(unsigned long *ThunkData = (unsigned long *)(RawOffset + (Thunk - ImportSection->VirtualAddress));
+                                        *ThunkData;
+                                        ++ThunkData)
+                                    {
+                                        printf("    %s\n", RawOffset + (*ThunkData - ImportSection->VirtualAddress + 2));
+                                    }
                                 }
                             }
                         }
