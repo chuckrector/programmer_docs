@@ -272,12 +272,41 @@ int main(int ArgCount, char **Args)
                         printf("PE signature offset: 0x%x\n", DOSHeader->PEAddress);
                         pe_header *PEHeader = (pe_header *)(PE + 4);
 
-                        printf("Machine ");
+                        printf("Machine 0x%4d ", PEHeader->Machine);
                         switch(PEHeader->Machine)
                         {
-                            case 0x014c: printf("0x014c x86\n"); break;
-                            case 0x0200: printf("0x0200 Intel Itanium\n"); break;
-                            case 0x8664: printf("0x8664 x64\n"); break;
+                            case 0x014c: printf("Intel 386 or later processors and compatible processors\n"); break;
+                            case 0x0160: printf("MIPS big endian\n"); break;
+                            case 0x0162: printf("MIPS little endian\n"); break;
+                            case 0x0166: printf("MIPS little endian R4000\n"); break;
+                            case 0x0168: printf("MIPS little endian R10000\n"); break;
+                            case 0x0169: printf("MIPS little endian WCE v2\n"); break;
+                            case 0x0184: printf("Alpha_AXP\n"); break;
+                            case 0x01a2: printf("Hitachi SH3 little endian\n"); break;
+                            case 0x01a3: printf("Hitachi SH3 DSP\n"); break;
+                            case 0x01a4: printf("SH3E little endian\n"); break;
+                            case 0x01a6: printf("Hitachi SH4\n"); break;
+                            case 0x01a8: printf("Hitachi SH5\n"); break;
+                            case 0x01c0: printf("ARM little endian\n"); break;
+                            case 0x01c2: printf("ARM or Thumb ('interworking') little endian\n"); break;
+                            case 0x01c4: printf("ARM Thumb-2 little endian\n"); break;
+                            case 0x01d3: printf("Matsushita AM33\n"); break;
+                            case 0x01f0: printf("Power PC little endian\n"); break;
+                            case 0x01f1: printf("Power PC with floating point support\n"); break;
+                            case 0x0200: printf("Intel Itanium processor family\n"); break;
+                            case 0x0266: printf("MIPS16\n"); break;
+                            case 0x0284: printf("ALPHA64\n"); break;
+                            case 0x0366: printf("MIPS with FPU\n"); break;
+                            case 0x0466: printf("MIPS16 with FPU\n"); break;
+                            case 0x0520: printf("Infineon\n"); break;
+                            case 0x0cef: printf("CEF\n"); break;
+                            case 0x0ebc: printf("EFI byte code\n"); break;
+                            case 0x5032: printf("RISC-V 32-bit address space\n"); break;
+                            case 0x5064: printf("RISC-V 64-bit address space\n"); break;
+                            case 0x5128: printf("RISC-V 128-bit address space\n"); break;
+                            case 0x8664: printf("x64\n"); break;
+                            case 0x9041: printf("Mitsubishi M32R little endian\n"); break;
+                            case 0xaa64: printf("ARM64 little endian\n"); break;
                             default: printf("Unknown\n"); break;
                         }
 
@@ -309,7 +338,8 @@ int main(int ArgCount, char **Args)
 
                         pe_directory *ImportTable = 0;
                         char *PEOptionalHeaderStart = (char *)PEHeader + sizeof(pe_header);
-                        if(PEHeader->Machine == 0x8664)
+                        bool Is64Bit = (PEHeader->OptionalHeaderLength == sizeof(pe_optional_header64));
+                        if(Is64Bit)
                         {
                             pe_optional_header64 *PEOptionalHeader = (pe_optional_header64 *)PEOptionalHeaderStart;
                             ImportTable = PEOptionalHeader->Directory + 1;
@@ -435,7 +465,7 @@ int main(int ArgCount, char **Args)
                                     {
                                         Thunk = Import->FirstThunk;
                                     }
-                                    if(PEHeader->Machine == 0x8664)
+                                    if(Is64Bit)
                                     {
                                         for(unsigned long long *ThunkData = (unsigned long long *)(RawOffset + (Thunk - ImportSection->VirtualAddress));
                                             *ThunkData;
