@@ -30,7 +30,7 @@ struct pe_directory
 };
 
 // NOTE(chuck): All versions are in Major + Minor order.
-struct pe_optional_header
+struct pe_optional_header32
 {
     unsigned short Magic;
     unsigned char  LinkerVersion[2];
@@ -56,6 +56,37 @@ struct pe_optional_header
     unsigned long  StackCommitLength;
     unsigned long  HeapReserveLength;
     unsigned long  HeapCommitLength;
+    unsigned long  LoaderFlags; // NOTE(chuck): Obsolete
+    unsigned long  DirectoryCount;
+    pe_directory   Directory[16];
+};
+
+struct pe_optional_header64
+{
+    unsigned short Magic;
+    unsigned char  LinkerVersion[2];
+    unsigned long  CodeLength;
+    unsigned long  InitializedDataLength;
+    unsigned long  UninitializedDataLength;
+    unsigned long  EntryPointAddress;
+    unsigned long  CodeAddress;
+    // unsigned long  DataAddress; // NOTE(chuck): 64-bit does not have a data address.
+    unsigned long long ImageAddress; // NOTE(chuck): 64-bit
+    unsigned long  SectionAligment;
+    unsigned long  FileAlignment;
+    unsigned short OSVersion[2];
+    unsigned short ImageVersion[2];
+    unsigned short SubsystemVersion[2];
+    unsigned long  Reserved;
+    unsigned long  ImageLength;
+    unsigned long  HeadersLength;
+    unsigned long  Checksum;
+    unsigned short Subsystem;
+    unsigned short DLLCharacteristics;
+    unsigned long long StackReserveLength;// NOTE(chuck): 64-bit
+    unsigned long long StackCommitLength;// NOTE(chuck): 64-bit
+    unsigned long long HeapReserveLength; // NOTE(chuck): 64-bit
+    unsigned long long HeapCommitLength; // NOTE(chuck): 64-bit
     unsigned long  LoaderFlags; // NOTE(chuck): Obsolete
     unsigned long  DirectoryCount;
     pe_directory   Directory[16];
@@ -104,6 +135,111 @@ PrintBitFlags(unsigned long Value, bit_flag *Flags, int FlagCount, int Indent=2,
         }
     }
 }
+
+static void
+PrintSubsystem(int Subsystem)
+{
+    printf("Subsystem\n");
+    switch(Subsystem)
+    {
+        case  0: printf("   0 Unknown subsystem.\n"); break;
+        case  1: printf("   1 No subsystem required (device drivers and native system processes).\n"); break;
+        case  2: printf("   2 Windows graphical user interface (GUI) subsystem.\n"); break;
+        case  3: printf("   3 Windows character-mode user interface (CUI) subsystem.\n"); break;
+        case  5: printf("   5 OS/2 CUI subsystem.\n"); break;
+        case  7: printf("   7 POSIX CUI subsystem.\n"); break;
+        case  9: printf("   9 Windows CE system.\n"); break;
+        case 10: printf("  10 Extensible Firmware Interface (EFI) application.\n"); break;
+        case 11: printf("  11 EFI driver with boot services.\n"); break;
+        case 12: printf("  12 EFI driver with run-time services.\n"); break;
+        case 13: printf("  13 EFI ROM image.\n"); break;
+        case 14: printf("  14 Xbox system.\n"); break;
+        case 16: printf("  16 Boot application.\n"); break;
+    }
+}
+
+static void
+PrintDLLCharacteristics(int DLLCharacteristics)
+{
+    if(DLLCharacteristics)
+    {
+        printf("DLL characteristics\n");
+        bit_flag DLLCharacteristicBitFlags[] =
+        {
+            {0x0001, "Reserved."},
+            {0x0002, "Reserved."},
+            {0x0004, "Reserved."},
+            {0x0008, "Reserved."},
+            {0x0020, "ASLR with 64 bit address space."},
+            {0x0040, "The DLL can be relocated at load time."},
+            {0x0080, "Code integrity checks are forced. If you set this flag and a section contains only uninitialized data, set the PointerToRawData member of IMAGE_SECTION_HEADER for that section to zero; otherwise, the image will fail to load because the digital signature cannot be verified."},
+            {0x0100, "The image is compatible with data execution prevention (DEP)."},
+            {0x0200, "The image is isolation aware, but should not be isolated."},
+            {0x0400, "The image does not use structured exception handling (SEH). No handlers can be called in this image."},
+            {0x0800, "Do not bind the image."},
+            {0x1000, "Image should execute in an AppContainer."},
+            {0x2000, "A WDM driver."},
+            {0x4000, "Image supports Control Flow Guard."},
+            {0x8000, "The image is terminal server aware."},
+        };
+        PrintBitFlags(DLLCharacteristics, DLLCharacteristicBitFlags, ArrayCount(DLLCharacteristicBitFlags));
+    }
+}
+
+static void
+PrintDirectories(int DirectoryCount, pe_directory *DirectoryList)
+{
+    printf("Directory count %d\n", DirectoryCount);
+    char *DirectoryDescriptor[] =
+    {
+        "Export table",
+        "Import table",
+        "Resource table",
+        "Exception table",
+        "Certificate table",
+        "Base relocation table",
+        "Debug info",
+        "Architecture-specific data",
+        "Global pointer register",
+        "Thread local storage table",
+        "Load configuration table",
+        "Bound import table",
+        "Import address table",
+        "Delay import descriptor",
+        "CLR header",
+        "Reserved",
+    };
+    for(int DirectoryIndex = 0;
+        DirectoryIndex < ArrayCount(DirectoryList);
+        ++DirectoryIndex)
+    {
+        pe_directory *Directory = DirectoryList + DirectoryIndex;
+        printf("  (%02d) %27s: Virtual address 0x%08x, %d bytes\n",
+            DirectoryIndex, DirectoryDescriptor[DirectoryIndex],
+            Directory->VirtualAddress, Directory->Size);
+    }
+}
+
+#define PrintSharedHeaderInfo(PEOptionalHeader) \
+    printf("   Linker version %d.%d\n", PEOptionalHeader->LinkerVersion[0], PEOptionalHeader->LinkerVersion[1]); \
+    printf("       OS version %d.%d\n", PEOptionalHeader->OSVersion[0], PEOptionalHeader->OSVersion[1]); \
+    printf("    Image version %d.%d\n", PEOptionalHeader->ImageVersion[0], PEOptionalHeader->ImageVersion[1]); \
+    printf("Subsystem version %d.%d\n", PEOptionalHeader->SubsystemVersion[0], PEOptionalHeader->SubsystemVersion[1]); \
+    printf("Section alignment %d\n", PEOptionalHeader->SectionAligment); \
+    printf("   File alignment %d\n", PEOptionalHeader->FileAlignment); \
+    printf("         Checksum 0x%08x\n", PEOptionalHeader->Checksum); \
+    printf("        Code size %d bytes\n", PEOptionalHeader->CodeLength); \
+    printf("   Init data size %d bytes\n", PEOptionalHeader->InitializedDataLength); \
+    printf(" Uninit data size %d bytes\n", PEOptionalHeader->UninitializedDataLength); \
+    printf("       Image size %d bytes\n", PEOptionalHeader->ImageLength); \
+    printf("     Headers size %d bytes\n", PEOptionalHeader->HeadersLength); \
+    printf("   Stack reserved %lld bytes\n", (unsigned long long)PEOptionalHeader->StackReserveLength); \
+    printf("   Stack   commit %lld bytes\n", (unsigned long long)PEOptionalHeader->StackCommitLength); \
+    printf("    Heap reserved %lld bytes\n", (unsigned long long)PEOptionalHeader->HeapReserveLength); \
+    printf("    Heap   commit %lld bytes\n", (unsigned long long)PEOptionalHeader->HeapCommitLength); \
+    printf("            Entry 0x%08x\n", PEOptionalHeader->EntryPointAddress); \
+    printf("             Code 0x%08x\n", PEOptionalHeader->CodeAddress); \
+    printf("            Image 0x%016llx\n", (unsigned long long)PEOptionalHeader->ImageAddress);
 
 int main(int ArgCount, char **Args)
 {
@@ -171,105 +307,30 @@ int main(int ArgCount, char **Args)
                         };
                         PrintBitFlags(PEHeader->Characteristics, PEHeaderCharacteristics, ArrayCount(PEHeaderCharacteristics));
 
+                        pe_directory *ImportTable = 0;
+                        char *PEOptionalHeaderStart = (char *)PEHeader + sizeof(pe_header);
+                        if(PEHeader->Machine == 0x8664)
+                        {
+                            pe_optional_header64 *PEOptionalHeader = (pe_optional_header64 *)PEOptionalHeaderStart;
+                            ImportTable = PEOptionalHeader->Directory + 1;
 
-                        pe_optional_header *PEOptionalHeader = (pe_optional_header *)((char *)PEHeader + sizeof(pe_header));
-                        
-                        printf("   Linker version %d.%d\n", PEOptionalHeader->LinkerVersion[0], PEOptionalHeader->LinkerVersion[1]);
-                        printf("       OS version %d.%d\n", PEOptionalHeader->OSVersion[0], PEOptionalHeader->OSVersion[1]);
-                        printf("    Image version %d.%d\n", PEOptionalHeader->ImageVersion[0], PEOptionalHeader->ImageVersion[1]);
-                        printf("Subsystem version %d.%d\n", PEOptionalHeader->SubsystemVersion[0], PEOptionalHeader->SubsystemVersion[1]);
-                        printf("Section alignment %d\n", PEOptionalHeader->SectionAligment);
-                        printf("   File alignment %d\n", PEOptionalHeader->FileAlignment);
-                        printf("         Checksum 0x%08x\n", PEOptionalHeader->Checksum);
+                            PrintSharedHeaderInfo(PEOptionalHeader);
+                            PrintSubsystem(PEOptionalHeader->Subsystem);
+                            PrintDLLCharacteristics(PEOptionalHeader->DLLCharacteristics);
+                            PrintDirectories(PEOptionalHeader->DirectoryCount, PEOptionalHeader->Directory);
+                        }
+                        else
+                        {
+                            pe_optional_header32 *PEOptionalHeader = (pe_optional_header32 *)PEOptionalHeaderStart;
+                            ImportTable = PEOptionalHeader->Directory + 1;
 
-                        printf("        Code size %d bytes\n", PEOptionalHeader->CodeLength);
-                        printf("   Init data size %d bytes\n", PEOptionalHeader->InitializedDataLength);
-                        printf(" Uninit data size %d bytes\n", PEOptionalHeader->UninitializedDataLength);
-                        printf("       Image size %d bytes\n", PEOptionalHeader->ImageLength);
-                        printf("     Headers size %d bytes\n", PEOptionalHeader->HeadersLength);
-
-                        printf("            Entry 0x%08x\n", PEOptionalHeader->EntryPointAddress);
-                        printf("             Code 0x%08x\n", PEOptionalHeader->CodeAddress);
-                        printf("             Data 0x%08x\n", PEOptionalHeader->DataAddress);
-                        printf("            Image 0x%08x\n", PEOptionalHeader->ImageAddress);
-                        
-                        printf("Subsystem\n");
-                        switch(PEOptionalHeader->Subsystem)
-                        {
-                            case  0: printf("   0 Unknown subsystem.\n"); break;
-                            case  1: printf("   1 No subsystem required (device drivers and native system processes).\n"); break;
-                            case  2: printf("   2 Windows graphical user interface (GUI) subsystem.\n"); break;
-                            case  3: printf("   3 Windows character-mode user interface (CUI) subsystem.\n"); break;
-                            case  5: printf("   5 OS/2 CUI subsystem.\n"); break;
-                            case  7: printf("   7 POSIX CUI subsystem.\n"); break;
-                            case  9: printf("   9 Windows CE system.\n"); break;
-                            case 10: printf("  10 Extensible Firmware Interface (EFI) application.\n"); break;
-                            case 11: printf("  11 EFI driver with boot services.\n"); break;
-                            case 12: printf("  12 EFI driver with run-time services.\n"); break;
-                            case 13: printf("  13 EFI ROM image.\n"); break;
-                            case 14: printf("  14 Xbox system.\n"); break;
-                            case 16: printf("  16 Boot application.\n"); break;
+                            PrintSharedHeaderInfo(PEOptionalHeader);
+                            printf("             Data 0x%08x\n", PEOptionalHeader->DataAddress); // NOTE(chuck): Data address is specific to 32-bit.
+                            PrintSubsystem(PEOptionalHeader->Subsystem);
+                            PrintDLLCharacteristics(PEOptionalHeader->DLLCharacteristics);
+                            PrintDirectories(PEOptionalHeader->DirectoryCount, PEOptionalHeader->Directory);
                         }
-                        
-                        if(PEOptionalHeader->DLLCharacteristics)
-                        {
-                            printf("DLL characteristics\n");
-                            bit_flag DLLCharacteristics[] =
-                            {
-                                {0x0001, "Reserved."},
-                                {0x0002, "Reserved."},
-                                {0x0004, "Reserved."},
-                                {0x0008, "Reserved."},
-                                {0x0020, "ASLR with 64 bit address space."},
-                                {0x0040, "The DLL can be relocated at load time."},
-                                {0x0080, "Code integrity checks are forced. If you set this flag and a section contains only uninitialized data, set the PointerToRawData member of IMAGE_SECTION_HEADER for that section to zero; otherwise, the image will fail to load because the digital signature cannot be verified."},
-                                {0x0100, "The image is compatible with data execution prevention (DEP)."},
-                                {0x0200, "The image is isolation aware, but should not be isolated."},
-                                {0x0400, "The image does not use structured exception handling (SEH). No handlers can be called in this image."},
-                                {0x0800, "Do not bind the image."},
-                                {0x1000, "Image should execute in an AppContainer."},
-                                {0x2000, "A WDM driver."},
-                                {0x4000, "Image supports Control Flow Guard."},
-                                {0x8000, "The image is terminal server aware."},
-                            };
-                            PrintBitFlags(PEOptionalHeader->DLLCharacteristics, DLLCharacteristics, ArrayCount(DLLCharacteristics));
-                        }
-                        
-                        printf("Stack reserved %d bytes\n", PEOptionalHeader->StackReserveLength);
-                        printf("Stack   commit %d bytes\n", PEOptionalHeader->StackCommitLength);
-                        printf(" Heap reserved %d bytes\n", PEOptionalHeader->HeapReserveLength);
-                        printf(" Heap   commit %d bytes\n", PEOptionalHeader->HeapCommitLength);
-                        
-                        printf("Directory count %d\n", PEOptionalHeader->DirectoryCount);
-                        char *DirectoryDescriptor[] =
-                        {
-                            "Export table",
-                            "Import table",
-                            "Resource table",
-                            "Exception table",
-                            "Certificate table",
-                            "Base relocation table",
-                            "Debug info",
-                            "Architecture-specific data",
-                            "Global pointer register",
-                            "Thread local storage table",
-                            "Load configuration table",
-                            "Bound import table",
-                            "Import address table",
-                            "Delay import descriptor",
-                            "CLR header",
-                            "Reserved",
-                        };
-                        for(int DirectoryIndex = 0;
-                            DirectoryIndex < ArrayCount(PEOptionalHeader->Directory);
-                            ++DirectoryIndex)
-                        {
-                            pe_directory *Directory = PEOptionalHeader->Directory + DirectoryIndex;
-                            printf("  (%02d) %27s: Virtual address 0x%08x, %d bytes\n",
-                                DirectoryIndex, DirectoryDescriptor[DirectoryIndex],
-                                Directory->VirtualAddress, Directory->Size);
-                        }
-                        
+                            
 
                         if(PEHeader->SectionCount)
                         {
@@ -321,12 +382,11 @@ int main(int ArgCount, char **Args)
                                 {0x80000000, "The section can be written to."},
                             };
 
-                            pe_directory *ImportTable = PEOptionalHeader->Directory + 1;
                             printf("Import table virtual address 0x%08x\n", ImportTable->VirtualAddress);
 
                             // NOTE(chuck): Optional header size varies!  I've seen 224 and 240 byte lengths;
                             pe_section_header *ImportSection = 0;
-                            pe_section_header *PESectionHeader = (pe_section_header *)((char *)PEOptionalHeader + PEHeader->OptionalHeaderLength);
+                            pe_section_header *PESectionHeader = (pe_section_header *)(PEOptionalHeaderStart + PEHeader->OptionalHeaderLength);
                             for(int SectionIndex = 0;
                                 SectionIndex < PEHeader->SectionCount;
                                 ++SectionIndex, ++PESectionHeader)
@@ -375,11 +435,23 @@ int main(int ArgCount, char **Args)
                                     {
                                         Thunk = Import->FirstThunk;
                                     }
-                                    for(unsigned long *ThunkData = (unsigned long *)(RawOffset + (Thunk - ImportSection->VirtualAddress));
-                                        *ThunkData;
-                                        ++ThunkData)
+                                    if(PEHeader->Machine == 0x8664)
                                     {
-                                        printf("    %s\n", RawOffset + (*ThunkData - ImportSection->VirtualAddress + 2));
+                                        for(unsigned long long *ThunkData = (unsigned long long *)(RawOffset + (Thunk - ImportSection->VirtualAddress));
+                                            *ThunkData;
+                                            ++ThunkData)
+                                        {
+                                            printf("    %s\n", RawOffset + (*ThunkData - ImportSection->VirtualAddress + 2));
+                                        }
+                                    }
+                                    else
+                                    {
+                                        for(unsigned long *ThunkData = (unsigned long *)(RawOffset + (Thunk - ImportSection->VirtualAddress));
+                                            *ThunkData;
+                                            ++ThunkData)
+                                        {
+                                            printf("    %s\n", RawOffset + (*ThunkData - ImportSection->VirtualAddress + 2));
+                                        }
                                     }
                                 }
                             }
