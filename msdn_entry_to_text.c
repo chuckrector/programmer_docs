@@ -57,46 +57,46 @@ struct string
 struct file_reader
 {
     int At;
-    string *FileData;
-    string *Line;
+    struct string *FileData;
+    struct string *Line;
     int PreviousLineAt;
 };
 
 struct param
 {
-    string *Name;
-    string *Type;
-    string *Description;
+    struct string *Name;
+    struct string *Type;
+    struct string *Description;
 };
 
 struct param_list
 {
     int Count;
-    param Params[50];
+    struct param Params[50];
 };
 
 struct return_value
 {
-    string *Type;
-    string *Description;
+    struct string *Type;
+    struct string *Description;
 };
 
 struct msdn_entry
 {
-    string *Title;
-    string *Description;
-    string *MinimumSupportedClient;
-    string *MinimumSupportedServer;
-    string *PlatformRequirements; // NOTE(chuck): If min supported aren't available, e.g. XInputGetState
-    string *RequiredHeader;
-    string *RequiredIncludeHeader; // NOTE(chuck): Optional
-    string *RequiredLibrary;
-    string *RequiredDLL;
-    string *Syntax;
-    string *Remarks;
+    struct string *Title;
+    struct string *Description;
+    struct string *MinimumSupportedClient;
+    struct string *MinimumSupportedServer;
+    struct string *PlatformRequirements; // NOTE(chuck): If min supported aren't available, e.g. XInputGetState
+    struct string *RequiredHeader;
+    struct string *RequiredIncludeHeader; // NOTE(chuck): Optional
+    struct string *RequiredLibrary;
+    struct string *RequiredDLL;
+    struct string *Syntax;
+    struct string *Remarks;
 
-    param_list Params;
-    return_value ReturnValue;
+    struct param_list Params;
+    struct return_value ReturnValue;
 };
 
 internal b32
@@ -107,7 +107,7 @@ InBounds(int Value, int LowInclusive, int HighExclusive)
 }
 
 internal char
-PeekChar(file_reader *Reader, int Delta = 0)
+PeekChar(struct file_reader *Reader, int Delta)
 {
     char Result = 0;
 
@@ -121,9 +121,9 @@ PeekChar(file_reader *Reader, int Delta = 0)
 }
 
 internal b32
-IsNewLine(file_reader *Reader)
+IsNewLine(struct file_reader *Reader)
 {
-    int C0 = PeekChar(Reader);
+    int C0 = PeekChar(Reader, 0);
     int C1 = PeekChar(Reader, 1);
     b32 Result = ((C0 == '\r') && (C1 == '\n')) ||
                   (C0 == '\r') ||
@@ -132,7 +132,7 @@ IsNewLine(file_reader *Reader)
 }
 
 internal b32
-AtEnd(file_reader *Reader)
+AtEnd(struct file_reader *Reader)
 {
     b32 Result = (Reader->At >= Reader->FileData->Length);
     return(Result);
@@ -169,11 +169,11 @@ IsOneOf(char C, char *Chars)
 }
 
 internal int
-SkipNewLine(file_reader *Reader)
+SkipNewLine(struct file_reader *Reader)
 {
     int Result = 0;
 
-    int C0 = PeekChar(Reader);
+    int C0 = PeekChar(Reader, 0);
     int C1 = PeekChar(Reader, 1);
     if((C0 == '\r') && (C1 == '\n'))
     {
@@ -188,13 +188,13 @@ SkipNewLine(file_reader *Reader)
 }
 
 internal int
-SkipAnyAdjacent(file_reader *Reader, char *Chars)
+SkipAnyAdjacent(struct file_reader *Reader, char *Chars)
 {
     int Result = 0;
 
     while(!AtEnd(Reader))
     {
-        if(IsOneOf(PeekChar(Reader), Chars))
+        if(IsOneOf(PeekChar(Reader, 0), Chars))
         {
             ++Result;
         }
@@ -207,10 +207,10 @@ SkipAnyAdjacent(file_reader *Reader, char *Chars)
     return(Result);
 }
 
-internal string *
-CutRight(string *String, int CutHere)
+internal struct string *
+CutRight(struct string *String, int CutHere)
 {
-    string *Result = PushStruct(string);
+    struct string *Result = PushStruct(struct string);
     if (CutHere >= String->Length)
     {
         Result->Length = 0;
@@ -227,8 +227,8 @@ CutRight(string *String, int CutHere)
 }
 
 // NOTE(chuck): This modifies the string in-place.  It collapses \[ and \] into [ and ] and appends a space for each.
-internal string *
-UnescapeBrackets(string *String)
+internal struct string *
+UnescapeBrackets(struct string *String)
 {
     char *P = String->StringData;
     for(int Index = 0;
@@ -250,13 +250,13 @@ UnescapeBrackets(string *String)
     return(String);
 }
 
-internal string *
-TrimRight(string *String, char *Chars)
+internal struct string *
+TrimRight(struct string *String, char *Chars)
 {
-    string *Result = String;
+    struct string *Result = String;
     if(String->Length)
     {
-        Result = PushStruct(string);
+        Result = PushStruct(struct string);
         Result->Length = String->Length;
         Result->StringData = String->StringData;
 
@@ -280,13 +280,13 @@ TrimRight(string *String, char *Chars)
     return(Result);
 }
 
-internal string *
-TrimLeft(string *String, char *Chars)
+internal struct string *
+TrimLeft(struct string *String, char *Chars)
 {
-    string *Result = String;
+    struct string *Result = String;
     if(String->Length)
     {
-        PushStruct(string);
+        PushStruct(struct string);
         Result->Length = String->Length;
         Result->StringData = String->StringData;
 
@@ -313,7 +313,7 @@ TrimLeft(string *String, char *Chars)
 }
 
 internal b32
-ReadLine(file_reader *Reader)
+ReadLine(struct file_reader *Reader)
 {
     b32 Result = 1;
 
@@ -341,7 +341,7 @@ ReadLine(file_reader *Reader)
 }
 
 internal b32
-StartsWith(string *String, string *Chars)
+StartsWithSS(struct string *String, struct string *Chars)
 {
     b32 Result = 1;
 
@@ -367,7 +367,7 @@ StartsWith(string *String, string *Chars)
 }
 
 internal b32
-StartsWith(string *String, char *Chars)
+StartsWithSC(struct string *String, char *Chars)
 {
     b32 Result = 1;
 
@@ -394,7 +394,7 @@ StartsWith(string *String, char *Chars)
 }
 
 internal b32
-StringsAreEqual(string *String, char *Chars)
+StringsAreEqual(struct string *String, char *Chars)
 {
     b32 Result = 1;
 
@@ -436,7 +436,7 @@ MemoryIsEqual(char *A, char *B, int Length)
 }
 
 internal void
-ExpectStringsAreEqual(string *String, char *Chars)
+ExpectStringsAreEqual(struct string *String, char *Chars)
 {
     if(!StringsAreEqual(String, Chars))
     {
@@ -466,10 +466,10 @@ PrintHeader(char Underline, char *Format, ...)
     printf("\n");
 }
 
-internal string *
+internal struct string *
 ToString(char *Chars)
 {
-    string *Result = PushStruct(string);
+    struct string *Result = PushStruct(struct string);
     Result->Length = StringLength(Chars);
     Result->StringData = Chars;
     return(Result);
@@ -481,10 +481,10 @@ Copy(char *Dest, char *Source, int Length)
     while(Length--) *Dest++ = *Source++;
 }
 
-internal string *
-Prefix(string *String, string *Prefix)
+internal struct string *
+Prefix(struct string *String, struct string *Prefix)
 {
-    string *Result = PushStruct(string);
+    struct string *Result = PushStruct(struct string);
     Result->Length = Prefix->Length + String->Length;
     Result->StringData = PushArray(String->Length + Prefix->Length, char);
     Copy(Result->StringData, Prefix->StringData, Prefix->Length);
@@ -492,17 +492,17 @@ Prefix(string *String, string *Prefix)
     return(Result);
 }
 
-internal string *
+internal struct string *
 NewStringFrom(int Length, char *Chars)
 {
-    string *Result = PushStruct(string);
+    struct string *Result = PushStruct(struct string);
     Result->Length = Length;
     Result->StringData = Chars;
     return(Result);
 }
 
 internal void
-SkipBlankLines(file_reader *Reader)
+SkipBlankLines(struct file_reader *Reader)
 {
     while(!AtEnd(Reader) && IsNewLine(Reader))
     {
@@ -510,17 +510,17 @@ SkipBlankLines(file_reader *Reader)
     }
 }
 
-internal string *
-Substring(string *String, int StartInclusive, int EndExclusive)
+internal struct string *
+Substring(struct string *String, int StartInclusive, int EndExclusive)
 {
-    string *Result = PushStruct(string);
+    struct string *Result = PushStruct(struct string);
     Result->Length = EndExclusive - StartInclusive;
     Result->StringData = String->StringData + StartInclusive;
     return(Result);
 }
 
 internal b32
-EndsWith(string *String, char *Chars)
+EndsWith(struct string *String, char *Chars)
 {
     b32 Result = 1;
 
@@ -546,12 +546,12 @@ EndsWith(string *String, char *Chars)
     return(Result);
 }
 
-internal string *
-Replace(string *String, char *This, char *That)
+internal struct string *
+Replace(struct string *String, char *This, char *That)
 {
     int ThisLength = StringLength(This);
     int ThatLength = StringLength(That);
-    string *Result = PushStruct(string);
+    struct string *Result = PushStruct(struct string);
 
     int ExpectedLength = 0;
     for(int Index = 0;
@@ -593,16 +593,16 @@ Replace(string *String, char *This, char *That)
     return(Result);
 }
 
-internal string *
-StripHtmlBold(string *String)
+internal struct string *
+StripHtmlBold(struct string *String)
 {
-    string *Result = Replace(String, "<b>", "");
+    struct string *Result = Replace(String, "<b>", "");
     Result = Replace(Result, "</b>", "");
     return(Result);
 }
 
 internal b32
-StringContains(string *String, char *Chars)
+StringContains(struct string *String, char *Chars)
 {
     int CharsLength = StringLength(Chars);
     b32 Result = 0;
@@ -643,61 +643,61 @@ int main(int ArgCount, char **Args)
             int BytesRead = fread(Memory, 1, MEMORY_LIMIT, MDFile);
             fclose(MDFile);
 
-            string Data = {BytesRead + 1, PushArray(BytesRead + 1, char)}; // NOTE(chuck): Null terminate so that newline checking can peek one ahead.
-            file_reader Reader = {0, &Data, PushStruct(string)};
+            struct string Data = {BytesRead + 1, PushArray(BytesRead + 1, char)}; // NOTE(chuck): Null terminate so that newline checking can peek one ahead.
+            struct file_reader Reader = {0, &Data, PushStruct(struct string)};
 
-            msdn_entry Entry = {};
+            struct msdn_entry Entry = {0};
 
             ReadLine(&Reader);
             ExpectStringsAreEqual(Reader.Line, "---");
 
             while(ReadLine(&Reader) && !StringsAreEqual(Reader.Line, "---"))
             {
-                if(StartsWith(Reader.Line, HEADER_TITLE_KEY))
+                if(StartsWithSC(Reader.Line, HEADER_TITLE_KEY))
                 {
                     Entry.Title = CutRight(Reader.Line, ArrayCountZ(HEADER_TITLE_KEY));
                 }
-                else if(StartsWith(Reader.Line, HEADER_MINIMUM_SUPPORTED_CLIENT_KEY))
+                else if(StartsWithSC(Reader.Line, HEADER_MINIMUM_SUPPORTED_CLIENT_KEY))
                 {
-                    string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_MINIMUM_SUPPORTED_CLIENT_KEY));
+                    struct string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_MINIMUM_SUPPORTED_CLIENT_KEY));
                     if(S->Length)
                     {
                         S = Replace(S, "<br/>", "");
                         Entry.MinimumSupportedClient = S;
                     }
                 }
-                else if(StartsWith(Reader.Line, HEADER_MINIMUM_SUPPORTED_SERVER_KEY))
+                else if(StartsWithSC(Reader.Line, HEADER_MINIMUM_SUPPORTED_SERVER_KEY))
                 {
-                    string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_MINIMUM_SUPPORTED_SERVER_KEY));;
+                    struct string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_MINIMUM_SUPPORTED_SERVER_KEY));;
                     if(S->Length)
                     {
                         S = Replace(S, "<br/>", "");
                         Entry.MinimumSupportedServer = S;
                     }
                 }
-                else if(StartsWith(Reader.Line, HEADER_LIB_REQUIRED_KEY))
+                else if(StartsWithSC(Reader.Line, HEADER_LIB_REQUIRED_KEY))
                 {
-                    string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_LIB_REQUIRED_KEY));
+                    struct string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_LIB_REQUIRED_KEY));
                     if(S->Length)
                     {
                         Entry.RequiredLibrary = S;
                     }
                 }
-                else if(StartsWith(Reader.Line, HEADER_DLL_REQUIRED_KEY))
+                else if(StartsWithSC(Reader.Line, HEADER_DLL_REQUIRED_KEY))
                 {
-                    string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_DLL_REQUIRED_KEY));
+                    struct string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_DLL_REQUIRED_KEY));
                     if(S->Length)
                     {
                         Entry.RequiredDLL = S;
                     }
                 }
-                else if(StartsWith(Reader.Line, HEADER_REQUIRED_HEADER_KEY))
+                else if(StartsWithSC(Reader.Line, HEADER_REQUIRED_HEADER_KEY))
                 {
                     Entry.RequiredHeader = CutRight(Reader.Line, ArrayCountZ(HEADER_REQUIRED_HEADER_KEY));
                 }
-                else if(StartsWith(Reader.Line, HEADER_REQUIRED_INCLUDE_HEADER_KEY))
+                else if(StartsWithSC(Reader.Line, HEADER_REQUIRED_INCLUDE_HEADER_KEY))
                 {
-                     string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_REQUIRED_INCLUDE_HEADER_KEY));
+                     struct string *S = CutRight(Reader.Line, ArrayCountZ(HEADER_REQUIRED_INCLUDE_HEADER_KEY));
                      if (S->Length)
                      {
                         Entry.RequiredIncludeHeader = S;
@@ -707,40 +707,40 @@ int main(int ArgCount, char **Args)
 
             ExpectStringsAreEqual(Reader.Line, "---");
 
-            string *MarkdownTitle = Prefix(Entry.Title, ToString("# "));
+            struct string *MarkdownTitle = Prefix(Entry.Title, ToString("# "));
             while(ReadLine(&Reader))
             {
-                if(StartsWith(Reader.Line, MarkdownTitle) || StartsWith(Reader.Line, "## -description"))
+                if(StartsWithSS(Reader.Line, MarkdownTitle) || StartsWithSC(Reader.Line, "## -description"))
                 {
                     ReadLine(&Reader);
                     int Start = Reader.At;
-                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "#"))
+                    while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "#"))
                     {
                         // NOTE(chuck): Do nothing.
                     }
-                    Assert(StartsWith(Reader.Line, "#"));
+                    Assert(StartsWithSC(Reader.Line, "#"));
                     Reader.At = Reader.PreviousLineAt;
-                    string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
+                    struct string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
                     S = TrimRight(S, " \r\n");
                     Entry.Description = S;
                 }
-                else if(StartsWith(Reader.Line, "## -parameters"))
+                else if(StartsWithSC(Reader.Line, "## -parameters"))
                 {
                     ReadLine(&Reader);
-                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "## -returns"))
+                    while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "## -returns"))
                     {
                         #define PARAM_KEY "### -param "
-                        if(StartsWith(Reader.Line, PARAM_KEY))
+                        if(StartsWithSC(Reader.Line, PARAM_KEY))
                         {
-                            param *Param = Entry.Params.Params + Entry.Params.Count++;
+                            struct param *Param = Entry.Params.Params + Entry.Params.Count++;
                             Param->Name = CutRight(Reader.Line, ArrayCountZ(PARAM_KEY));
                             SkipBlankLines(&Reader);
 
                             ReadLine(&Reader);
                             #define TYPE_KEY "Type: "
-                            if(StartsWith(Reader.Line, TYPE_KEY))
+                            if(StartsWithSC(Reader.Line, TYPE_KEY))
                             {
-                                string *S = CutRight(Reader.Line, ArrayCountZ(TYPE_KEY));
+                                struct string *S = CutRight(Reader.Line, ArrayCountZ(TYPE_KEY));
                                 S = StripHtmlBold(S);
                                 Param->Type = S;
                                 SkipBlankLines(&Reader);
@@ -751,25 +751,25 @@ int main(int ArgCount, char **Args)
                             }
 
                             int Start = Reader.At;
-                            while(ReadLine(&Reader) && !StartsWith(Reader.Line, "#"))
+                            while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "#"))
                             {
                                 // NOTE(chuck): Do nothing.
                             }
-                            Assert(StartsWith(Reader.Line, "#"));
+                            Assert(StartsWithSC(Reader.Line, "#"));
                             Reader.At = Reader.PreviousLineAt;
-                            string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
+                            struct string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
                             S = TrimRight(S, " \r\n");
                             Param->Description = S;
                         }
                     }
                     
-                    Assert(StartsWith(Reader.Line, "## -returns"));
+                    Assert(StartsWithSC(Reader.Line, "## -returns"));
                     SkipBlankLines(&Reader);
 
                     ReadLine(&Reader);
-                    if(StartsWith(Reader.Line, TYPE_KEY))
+                    if(StartsWithSC(Reader.Line, TYPE_KEY))
                     {
-                        string *S = CutRight(Reader.Line, ArrayCountZ(TYPE_KEY));;
+                        struct string *S = CutRight(Reader.Line, ArrayCountZ(TYPE_KEY));;
                         S = StripHtmlBold(S);
                         Entry.ReturnValue.Type = S;
                         SkipBlankLines(&Reader);
@@ -780,24 +780,24 @@ int main(int ArgCount, char **Args)
                     }
 
                     int Start = Reader.At;
-                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "#"))
+                    while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "#"))
                     {
                         // NOTE(chuck): Do nothing.
                     }
-                    Assert(StartsWith(Reader.Line, "#"));
+                    Assert(StartsWithSC(Reader.Line, "#"));
                     Reader.At = Reader.PreviousLineAt;
-                    string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
+                    struct string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
                     S = TrimRight(S, " \r\n");
                     Entry.ReturnValue.Description = S;
                 }
-                else if(StartsWith(Reader.Line, "## Return value"))
+                else if(StartsWithSC(Reader.Line, "## Return value"))
                 {
                     SkipBlankLines(&Reader);
 
                     ReadLine(&Reader);
-                    if(StartsWith(Reader.Line, TYPE_KEY))
+                    if(StartsWithSC(Reader.Line, TYPE_KEY))
                     {
-                        string *S = CutRight(Reader.Line, ArrayCountZ(TYPE_KEY));;
+                        struct string *S = CutRight(Reader.Line, ArrayCountZ(TYPE_KEY));;
                         S = StripHtmlBold(S);
                         Entry.ReturnValue.Type = S;
                         SkipBlankLines(&Reader);
@@ -808,35 +808,35 @@ int main(int ArgCount, char **Args)
                     }
 
                     int Start = Reader.At;
-                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "#"))
+                    while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "#"))
                     {
                         // NOTE(chuck): Do nothing.
                     }
-                    Assert(StartsWith(Reader.Line, "#"));
+                    Assert(StartsWithSC(Reader.Line, "#"));
                     Reader.At = Reader.PreviousLineAt;
-                    string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
+                    struct string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
                     S = TrimRight(S, " \r\n");
                     Entry.ReturnValue.Description = S;
                 }
-                else if(StartsWith(Reader.Line, "## Remarks") || StartsWith(Reader.Line, "## -remarks"))
+                else if(StartsWithSC(Reader.Line, "## Remarks") || StartsWithSC(Reader.Line, "## -remarks"))
                 {
                     SkipBlankLines(&Reader);
                     int Start = Reader.At;
                     int LineBeforePlatformRequirements = -1;
-                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "## "))
+                    while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "## "))
                     {
                         if(StringContains(Reader.Line, "id=\"Platform_Requirements\"") ||
-                           StartsWith(Reader.Line, "### Platform Requirements"))
+                           StartsWithSC(Reader.Line, "### Platform Requirements"))
                         {
                             LineBeforePlatformRequirements = Reader.PreviousLineAt;
                             int StartPlatformRequirements = Reader.At;
-                            while(ReadLine(&Reader) && !StartsWith(Reader.Line, "## "))
+                            while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "## "))
                             {
                                 // NOTE(chuck): Do nothing.
                             }
-                            Assert(StartsWith(Reader.Line, "#"));
+                            Assert(StartsWithSC(Reader.Line, "#"));
                             Reader.At = Reader.PreviousLineAt;
-                            string *S = NewStringFrom(Reader.At - StartPlatformRequirements, Reader.FileData->StringData + StartPlatformRequirements);
+                            struct string *S = NewStringFrom(Reader.At - StartPlatformRequirements, Reader.FileData->StringData + StartPlatformRequirements);
                             S = TrimRight(S, " \r\n");
                             S = TrimLeft(S, " \r\n");
                             Entry.PlatformRequirements = S;
@@ -845,13 +845,13 @@ int main(int ArgCount, char **Args)
 
                     if(!AtEnd(&Reader))
                     {
-                        Assert(StartsWith(Reader.Line, "##"));
+                        Assert(StartsWithSC(Reader.Line, "##"));
                         Reader.At = Reader.PreviousLineAt;
                         if(LineBeforePlatformRequirements != -1)
                         {
                             Reader.At = LineBeforePlatformRequirements;
                         }
-                        string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
+                        struct string *S = NewStringFrom(Reader.At - Start, Reader.FileData->StringData + Start);
                         S = TrimRight(S, " \r\n");
                         if(S->Length)
                         {
@@ -859,49 +859,49 @@ int main(int ArgCount, char **Args)
                         }
                     }
                 }
-                else if(StartsWith(Reader.Line, "## Requirements"))
+                else if(StartsWithSC(Reader.Line, "## Requirements"))
                 {
-                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "##"))
+                    while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "##"))
                     {
-                        if(StartsWith(Reader.Line, FOOTER_MINIMUM_SUPPORTED_CLIENT_KEY))
+                        if(StartsWithSC(Reader.Line, FOOTER_MINIMUM_SUPPORTED_CLIENT_KEY))
                         {
                             Assert(!Entry.MinimumSupportedClient);
 
-                            string *S = TrimRight(Reader.Line, " |");
+                            struct string *S = TrimRight(Reader.Line, " |");
                             S = CutRight(S, ArrayCountZ(FOOTER_MINIMUM_SUPPORTED_CLIENT_KEY));
                             S = TrimLeft(S, " |");
                             S = UnescapeBrackets(S);
                             Entry.MinimumSupportedClient = S;
                         }
-                        else if(StartsWith(Reader.Line, FOOTER_MINIMUM_SUPPORTED_SERVER_KEY))
+                        else if(StartsWithSC(Reader.Line, FOOTER_MINIMUM_SUPPORTED_SERVER_KEY))
                         {
                             Assert(!Entry.MinimumSupportedServer);
 
-                            string *S = TrimRight(Reader.Line, " |");
+                            struct string *S = TrimRight(Reader.Line, " |");
                             S = CutRight(S, ArrayCountZ(FOOTER_MINIMUM_SUPPORTED_SERVER_KEY));
                             S = TrimLeft(S, " |");
                             S = UnescapeBrackets(S);
                             Entry.MinimumSupportedServer = S;
                         }
-                        else if(StartsWith(Reader.Line, FOOTER_LIB_REQUIRED_KEY))
+                        else if(StartsWithSC(Reader.Line, FOOTER_LIB_REQUIRED_KEY))
                         {
                             Assert(!Entry.RequiredLibrary);
 
-                            string *S = TrimRight(Reader.Line, " |");
+                            struct string *S = TrimRight(Reader.Line, " |");
                             Entry.RequiredLibrary = CutRight(S, ArrayCountZ(FOOTER_LIB_REQUIRED_KEY));
                         }
-                        else if(StartsWith(Reader.Line, FOOTER_DLL_REQUIRED_KEY))
+                        else if(StartsWithSC(Reader.Line, FOOTER_DLL_REQUIRED_KEY))
                         {
                             Assert(!Entry.RequiredDLL);
 
-                            string *S = TrimRight(Reader.Line, " |");
+                            struct string *S = TrimRight(Reader.Line, " |");
                             Entry.RequiredDLL = CutRight(S, ArrayCountZ(FOOTER_DLL_REQUIRED_KEY));
                         }
-                        else if(StartsWith(Reader.Line, FOOTER_REQUIRED_HEADER_KEY))
+                        else if(StartsWithSC(Reader.Line, FOOTER_REQUIRED_HEADER_KEY))
                         {
                             Assert(!Entry.RequiredHeader);
 
-                            string *S = TrimRight(Reader.Line, " |");
+                            struct string *S = TrimRight(Reader.Line, " |");
                             S = CutRight(S, ArrayCountZ(FOOTER_REQUIRED_HEADER_KEY));
                             S = Replace(S, "<br/>", "");
                             S = Replace(S, "<dl>", "");
@@ -913,24 +913,24 @@ int main(int ArgCount, char **Args)
                         }
                     }
                 }
-                else if(StartsWith(Reader.Line, "## Syntax"))
+                else if(StartsWithSC(Reader.Line, "## Syntax"))
                 {
-                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "```"))
+                    while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "```"))
                     {
                         // NOTE(chuck): Do nothing.
                     }
-                    Assert(StartsWith(Reader.Line, "```"));
+                    Assert(StartsWithSC(Reader.Line, "```"));
 
                     int Start = Reader.At;
                     int LastStart = Start;
-                    while(ReadLine(&Reader) && !StartsWith(Reader.Line, "```"))
+                    while(ReadLine(&Reader) && !StartsWithSC(Reader.Line, "```"))
                     {
                         LastStart = Reader.At;
                     }
-                    Assert(StartsWith(Reader.Line, "```"));
+                    Assert(StartsWithSC(Reader.Line, "```"));
                     Reader.At = LastStart;
 
-                    Entry.Syntax = PushStruct(string);
+                    Entry.Syntax = PushStruct(struct string);
                     Entry.Syntax->Length = (Reader.At - Start);
                     Entry.Syntax->StringData = Reader.FileData->StringData + Start;
                     Entry.Syntax = TrimRight(Entry.Syntax, "\r\n");
@@ -993,7 +993,7 @@ int main(int ArgCount, char **Args)
                     Index < Entry.Params.Count;
                     ++Index)
                 {
-                    param *Param = Entry.Params.Params + Index;
+                    struct param *Param = Entry.Params.Params + Index;
                     if(Param->Type)
                     {
                         printf("%.*s ", Param->Type->Length, Param->Type->StringData);

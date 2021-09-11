@@ -4,6 +4,7 @@
 
 static char Memory[1024 * 1024 * 64];
 #define ArrayCount(Array) (sizeof(Array)/(sizeof((Array)[0])))
+typedef int b32;
 
 struct dos_header
 {
@@ -58,7 +59,7 @@ struct pe_optional_header32
     unsigned long  HeapCommitLength;
     unsigned long  LoaderFlags; // NOTE(chuck): Obsolete
     unsigned long  DirectoryCount;
-    pe_directory   Directory[16];
+    struct pe_directory   Directory[16];
 };
 
 struct pe_optional_header64
@@ -89,7 +90,7 @@ struct pe_optional_header64
     unsigned long long HeapCommitLength; // NOTE(chuck): 64-bit
     unsigned long  LoaderFlags; // NOTE(chuck): Obsolete
     unsigned long  DirectoryCount;
-    pe_directory   Directory[16];
+    struct pe_directory   Directory[16];
 };
 
 struct pe_section_header
@@ -122,13 +123,13 @@ struct pe_import
 };
 
 static void
-PrintBitFlags(unsigned long Value, bit_flag *Flags, int FlagCount, int Indent=2, int HexWidthSpecifier=4)
+PrintBitFlags(unsigned long Value, struct bit_flag *Flags, int FlagCount, int Indent, int HexWidthSpecifier)
 {
     for(int Index = 0;
         Index < FlagCount;
         ++Index)
     {
-        bit_flag *Flag = Flags + Index;
+        struct bit_flag *Flag = Flags + Index;
         if(Value & Flag->Bits)
         {
             printf("%*s0x%.*x %s\n", Indent, " ", HexWidthSpecifier, Flag->Bits, Flag->Description);
@@ -164,7 +165,7 @@ PrintDLLCharacteristics(int DLLCharacteristics)
     if(DLLCharacteristics)
     {
         printf("DLL characteristics\n");
-        bit_flag DLLCharacteristicBitFlags[] =
+        struct bit_flag DLLCharacteristicBitFlags[] =
         {
             {0x0001, "Reserved."},
             {0x0002, "Reserved."},
@@ -182,12 +183,12 @@ PrintDLLCharacteristics(int DLLCharacteristics)
             {0x4000, "Image supports Control Flow Guard."},
             {0x8000, "The image is terminal server aware."},
         };
-        PrintBitFlags(DLLCharacteristics, DLLCharacteristicBitFlags, ArrayCount(DLLCharacteristicBitFlags));
+        PrintBitFlags(DLLCharacteristics, DLLCharacteristicBitFlags, ArrayCount(DLLCharacteristicBitFlags), 2, 4);
     }
 }
 
 static void
-PrintDirectories(int DirectoryCount, pe_directory *DirectoryList)
+PrintDirectories(int DirectoryCount, struct pe_directory *DirectoryList)
 {
     printf("Directory count %d\n", DirectoryCount);
     char *DirectoryDescriptor[] =
@@ -213,7 +214,7 @@ PrintDirectories(int DirectoryCount, pe_directory *DirectoryList)
         DirectoryIndex < ArrayCount(DirectoryList);
         ++DirectoryIndex)
     {
-        pe_directory *Directory = DirectoryList + DirectoryIndex;
+        struct pe_directory *Directory = DirectoryList + DirectoryIndex;
         printf("  (%02d) %27s: Virtual address 0x%08x, %d bytes\n",
             DirectoryIndex, DirectoryDescriptor[DirectoryIndex],
             Directory->VirtualAddress, Directory->Size);
@@ -259,7 +260,7 @@ int main(int ArgCount, char **Args)
             DWORD BytesRead;
             if(ReadFile(FileHandle, Memory, sizeof(Memory), &BytesRead, 0))
             {
-                dos_header *DOSHeader = (dos_header *)Memory;
+                struct dos_header *DOSHeader = (struct dos_header *)Memory;
                 if((DOSHeader->MZ[0] == 'M') &&
                    (DOSHeader->MZ[1] == 'Z'))
                 {
@@ -270,7 +271,7 @@ int main(int ArgCount, char **Args)
                        (PE[3] == 0))
                     {
                         printf("PE signature offset: 0x%x\n", DOSHeader->PEAddress);
-                        pe_header *PEHeader = (pe_header *)(PE + 4);
+                        struct pe_header *PEHeader = (struct pe_header *)(PE + 4);
 
                         printf("Machine 0x%4d ", PEHeader->Machine);
                         switch(PEHeader->Machine)
@@ -316,7 +317,7 @@ int main(int ArgCount, char **Args)
                         printf("Optional header length %d\n", PEHeader->OptionalHeaderLength);
 
                         printf("Characteristics\n");
-                        bit_flag PEHeaderCharacteristics[] =
+                        struct bit_flag PEHeaderCharacteristics[] =
                         {
                             {0x0001, "Relocation information was stripped from the file. The file must be loaded at its preferred base address. If the base address is not available, the loader reports an error."},
                             {0x0002, "The file is executable (there are no unresolved external references)."},
@@ -334,14 +335,14 @@ int main(int ArgCount, char **Args)
                             {0x4000, "The file should be run only on a uniprocessor computer."},
                             {0x8000, "The bytes of the word are reversed. This flag is obsolete."},
                         };
-                        PrintBitFlags(PEHeader->Characteristics, PEHeaderCharacteristics, ArrayCount(PEHeaderCharacteristics));
+                        PrintBitFlags(PEHeader->Characteristics, PEHeaderCharacteristics, ArrayCount(PEHeaderCharacteristics), 2, 4);
 
-                        pe_directory *ImportTable = 0;
-                        char *PEOptionalHeaderStart = (char *)PEHeader + sizeof(pe_header);
-                        bool Is64Bit = (PEHeader->OptionalHeaderLength == sizeof(pe_optional_header64));
+                        struct pe_directory *ImportTable = 0;
+                        char *PEOptionalHeaderStart = (char *)PEHeader + sizeof(struct pe_header);
+                        b32 Is64Bit = (PEHeader->OptionalHeaderLength == sizeof(struct pe_optional_header64));
                         if(Is64Bit)
                         {
-                            pe_optional_header64 *PEOptionalHeader = (pe_optional_header64 *)PEOptionalHeaderStart;
+                            struct pe_optional_header64 *PEOptionalHeader = (struct pe_optional_header64 *)PEOptionalHeaderStart;
                             ImportTable = PEOptionalHeader->Directory + 1;
 
                             PrintSharedHeaderInfo(PEOptionalHeader);
@@ -351,7 +352,7 @@ int main(int ArgCount, char **Args)
                         }
                         else
                         {
-                            pe_optional_header32 *PEOptionalHeader = (pe_optional_header32 *)PEOptionalHeaderStart;
+                            struct pe_optional_header32 *PEOptionalHeader = (struct pe_optional_header32 *)PEOptionalHeaderStart;
                             ImportTable = PEOptionalHeader->Directory + 1;
 
                             PrintSharedHeaderInfo(PEOptionalHeader);
@@ -365,7 +366,7 @@ int main(int ArgCount, char **Args)
                         if(PEHeader->SectionCount)
                         {
                             printf("%d section%s\n", PEHeader->SectionCount, (PEHeader->SectionCount == 1) ? "" : "s");
-                            bit_flag PESectionHeaderCharacteristics[] = 
+                            struct bit_flag PESectionHeaderCharacteristics[] = 
                             {
                                 {0x00000000, "Reserved."},
                                 {0x00000001, "Reserved."},
@@ -415,8 +416,8 @@ int main(int ArgCount, char **Args)
                             printf("Import table virtual address 0x%08x\n", ImportTable->VirtualAddress);
 
                             // NOTE(chuck): Optional header size varies!  I've seen 224 and 240 byte lengths;
-                            pe_section_header *ImportSection = 0;
-                            pe_section_header *PESectionHeader = (pe_section_header *)(PEOptionalHeaderStart + PEHeader->OptionalHeaderLength);
+                            struct pe_section_header *ImportSection = 0;
+                            struct pe_section_header *PESectionHeader = (struct pe_section_header *)(PEOptionalHeaderStart + PEHeader->OptionalHeaderLength);
                             for(int SectionIndex = 0;
                                 SectionIndex < PEHeader->SectionCount;
                                 ++SectionIndex, ++PESectionHeader)
@@ -455,7 +456,7 @@ int main(int ArgCount, char **Args)
                             {
                                 printf("DLL imports\n");
                                 char *RawOffset = Memory + ImportSection->RawAddress;
-                                for(pe_import *Import = (pe_import *)(RawOffset + (ImportTable->VirtualAddress - ImportSection->VirtualAddress));
+                                for(struct pe_import *Import = (struct pe_import *)(RawOffset + (ImportTable->VirtualAddress - ImportSection->VirtualAddress));
                                     Import->Name;
                                     ++Import)
                                 {
