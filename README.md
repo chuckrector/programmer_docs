@@ -24,4 +24,4 @@ build\msdn_entry_to_text sample1.md
 * I've currently only tested this on Windows 10.
 * I'm exploring the (chaotic) format and have only written a prototype to convert individual files so far.
 * The future plan would be to run a script that automatically downloads all of MSDN from GitHub (in a fashion similar to [degit](https://github.com/Rich-Harris/degit)) and automatically convert everything in one go.
-* Two `.md` samples are provided which demonstrate some of the variability of the format.
+* Some `.md` samples are provided which demonstrate some of the variability of the format.
